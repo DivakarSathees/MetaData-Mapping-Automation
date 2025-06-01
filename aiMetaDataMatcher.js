@@ -48,15 +48,24 @@ async function extractJSONArray(text) {
 }
 
 async function predictSubTopic(inputText) {
+
+    // input text contains some html & css tags like this - <p><strong>Problem Statement: Employee Management System</strong></p><p><strong>Objective:</strong></p><p><span style=\"color: rgb(51, 51, 51);\">You need to create the </span>
+    // We need to remove these tags and only keep the text content
+    inputText = inputText.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+
+
     try {
         const prompt = `Based on the following question, predict the most relevant and specific subject, topic, and subtopic names.
-These names can be slightly elaborative to reflect the real-world context of the question with the programming language it belongs to (ie) if it is related to dotnet, then return as ASP.net.
+These names reflect the real-world context of the question with the programming language it belongs to (ie) if it is related to dotnet, then return as ASP.net.
 note: Don't return generic names like "Programming" or "Web Development" & don't return any scenarios or examples.
 Return the result in JSON format: {"subject": "...", "topic": "...", "sub_topic": "..."}
 
-Question: ${inputText.trim().slice(0, 600)}`;
+Question: ${inputText.trim().slice(0, 2000)}`;
     
     // reduce the input text to a maximum of 1000 characters
+
+    console.log("Prompt for prediction:", prompt);
+    
 
         const response = await grop.chat.completions.create({
             model: 'llama3-8b-8192',
@@ -30821,33 +30830,203 @@ async function generateSearchStringQues(question) {
     return `${question.subject} ${question.topic} ${question.subtopic ? question.subtopic : question.sub_topic}`.toLowerCase();
 }
 
-// Preprocess question
+
 // async function tokenize(text) {
-//     // on tokenizing, if text includes # it should be included in the token
-//   return tokenizer.tokenize(text.toLowerCase());
+//   // Lowercase the text
+//   let lowerText = text.toLowerCase();
+// //   console.log("Tokenizing text:", lowerText);
+
+//   // Handle known dot-separated terms (you can expand this list as needed)
+//   const compoundTerms = ['ado.net', 'asp.net', 'entity.framework', 'dot.net'];
+//   for (const term of compoundTerms) {
+//     const token = term.replace(/\./g, '.'); // replace dot with underscore
+//     lowerText = lowerText.replace(new RegExp(term, 'g'), token);
+//   }
+
+//   //handle java full stack development as a single token
+//   const javaFullStack = 'java full stack development';
+//   lowerText = lowerText.replace(new RegExp(javaFullStack, 'g'), javaFullStack.replace(/ /g, ' '));
+
+//   // Match tokens that may start with # or contain underscores
+//   const tokens = lowerText.match(/[#]?\w+(?:[.]\w+)?/g) || [];
+
+//   // Remove duplicates while preserving order
+//   const uniqueTokens = Array.from(new Set(tokens));
+//   console.log("Unique Tokens:", uniqueTokens);
+  
+//   return uniqueTokens;
 // }
 
+
+// Cosine similarity
+
+
+
 async function tokenize(text) {
-  // Lowercase the text
-  const lowerText = text.toLowerCase();
+    const compoundPhrases = [
+//   'java full stack development',
+  'java full stack',
+//   'asp.net core',
+  'ado.net',
+  'asp.net',
+  'asp .net',
+  'machine learning',
+  'entity framework',
+  'dot net',
+  'data engineering',
+//   'data structures and algorithms',
+  'data structures',
+  'web development',
+  'web application',
+  'web technologies',
+  'spring mvc',
+  'kafka basics',
+  'kubernetes commands',
+  'microservices',
+  'basic python',
+  'python visualization',
+  'pandas',
+  'sql statement',
+  'conditional statements',
+  'basic sql'
+];
 
-  // Match words that may start with # (like #hashtag or #CSharp)
-  const tokens = lowerText.match(/[#]?\w+[#]?\w*/g) || [];
-    // Remove duplicates while preserving order
-    const uniqueTokens = Array.from(new Set(tokens));
-    // Return the unique tokens
-    return uniqueTokens;
+// remove some common phrases that are not useful for tokenization
+    const commonPhrases = [
+    'introduction to',
+    'working with',
+    'developing',
+    'using',
+    'in',
+    'and',
+    'the',
+    'for',
+    'of',
+    'on',
+    'with',
+    'to',
+    'a',
+    'an',
+    'is',
+    'are',
+    'as',
+    'by',
+    'at',
+    'from',
+    'that',
+    'this',
+    'it',
+    'its',
+    'which',
+    'all',
+    'about',
+    'how',
+    'what',
+    'where',
+    'when',
+    'why',
+    'who',
+    'can',
+    'will',
+    'do',
+    'does',
+    'did',
+    'has',
+    'have',
+    'had',
+    'be',
+    'being',
+    'been',
+    'if',
+    'then',
+    'else',
+    'but',
+    'programming'
+    ]
 
-  return tokens;
+
+  let lowerText = text.toLowerCase();
+
+  // Normalize whitespace
+  lowerText = lowerText.replace(/\s+/g, ' ');
+
+  // Replace compound phrases with <<phrase>> markers
+  for (const phrase of compoundPhrases.sort((a, b) => b.length - a.length)) {
+    const escapedPhrase = phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`\\b${escapedPhrase}\\b`, 'gi');
+    lowerText = lowerText.replace(regex, `<<${phrase}>>`);
+  }
+
+  // Regex explanation:
+  // <<.+?>>          => compound phrase markers
+  // #\w+             => hashtags
+  // \w+#?\w*         => words that may contain # anywhere (like c#, c#sharp)
+  // \w+(?:\.\w+)?    => dot separated words like asp.net, ado.net
+  // The order here is important; combine to catch all cases
+
+  // 
+
+  const tokens = lowerText.match(/<<.+?>>|#\w+|[\w#]+(?:\.\w+)?/g) || [];
+//   console.log("Tokens before cleaning:", lowerText);
+  
+
+  // Remove << >> from compound phrases
+  const cleanedTokens = tokens.map(token =>
+    token.startsWith('<<') && token.endsWith('>>') ? token.slice(2, -2) : token
+  );
+    const filtered = cleanedTokens.filter(token => !commonPhrases.includes(token));
+
+
+  // Remove duplicates preserving order
+  const uniqueTokens = [...new Set(filtered)];
+//   console.log("Unique Tokens:", uniqueTokens);
+  
+
+  return uniqueTokens;
 }
 
 
 
-// Cosine similarity
 async function cosineSimilarity(tokensA, tokensB) {
+    const weightedTokens = {
+    'ado.net': 3,  // Give ado.net triple weight
+    'asp.net': 2,
+    'sql': 1.5,
+    'java full stack development': 2, // Give java full stack development double weight
+    'java full stack': 2, // Give java full stack double weight
+    'entity framework': 1.5,
+    'dot net': 1.5,
+    'data engineering': 1.5,
+    'data structures': 1.5,
+    'c#': 2,
+    'java': 2,
+    'python': 2,
+    'web development': 1.5,
+    'web application': 1.5,
+    'spring mvc': 1.5,
+    'kafka basics': 1.5,
+    'kubernetes commands': 1.5,
+    'microservices': 1.5,
+    'basic python': 1.5,
+    'python visualization': 1.5,
+    'pandas': 1.5,
+    'sql statement': 1.5,
+    'conditional statements': 1.5,
+    'basic sql': 1.5
+};
+
   const allTokens = [...new Set([...tokensA, ...tokensB])];
-  const vecA = allTokens.map(token => tokensA.filter(t => t === token).length);
-  const vecB = allTokens.map(token => tokensB.filter(t => t === token).length);
+//   const vecA = allTokens.map(token => tokensA.filter(t => t === token).length);
+//   const vecB = allTokens.map(token => tokensB.filter(t => t === token).length);
+    const vecA = allTokens.map(token => {
+        const count = tokensA.filter(t => t === token).length;
+        return count * (weightedTokens[token] || 1); // apply weight
+    });
+
+    const vecB = allTokens.map(token => {
+        const count = tokensB.filter(t => t === token).length;
+        return count * (weightedTokens[token] || 1); // apply weight
+    });
 
   const dotProduct = vecA.reduce((sum, val, i) => sum + val * vecB[i], 0);
   const magnitudeA = Math.sqrt(vecA.reduce((sum, val) => sum + val ** 2, 0));
@@ -30856,45 +31035,134 @@ async function cosineSimilarity(tokensA, tokensB) {
   return dotProduct / (magnitudeA * magnitudeB || 1);
 }
 
-// Match question
+
+// async function findBestMatch(question, metadata) {
+//     let attempt = 0;
+//     let bestMatch = { id: null, score: 0 };
+//     let extratSub = null;
+//     let results = [];
+
+//     while (attempt < 3) {
+//         attempt++;
+
+//         const quesPrediction = await predictSubTopic(question);
+//         try {
+//             extratSub = await extractJSONArray(quesPrediction);
+//         } catch (err) {
+//             console.error("JSON extraction failed, skipping attempt", attempt, err);
+//             continue; // Skip this iteration if JSON is invalid
+//         }
+
+//         console.log(`Attempt ${attempt}: Prediction:`, extratSub);
+//         const questionText = await generateSearchStringQues(extratSub);
+//         const questionTokens = await tokenize(questionText);
+//         console.log("Question Tokens:", questionTokens);
+
+//         bestMatch = { id: null, score: 0 }; // Reset for this attempt
+//         results = [];
+
+//         for (const item of metadata) {
+//             const text = await generateSearchStringMetadata(item);
+//             const tokens = await tokenize(text);
+
+//             const score = await cosineSimilarity(questionTokens, tokens);
+//             if (score > bestMatch.score) {
+//                 bestMatch = {
+//                     id: item.sub_topic_id,
+//                     topic_id: item.topic.topic_id,
+//                     subject_id: item.topic.subject.subject_id,
+//                     score
+//                 };
+//                 results.push({
+//                     id: item.sub_topic_id,
+//                     score,
+//                     sub_topic: item.name,
+//                     topic: item.topic.name,
+//                     subject: item.topic.subject.name
+//                 });
+//             }
+//         }
+
+//         console.log("All Results:", results);
+        
+//         console.log(`Attempt ${attempt}: Best Score:`, bestMatch);
+//         if (bestMatch.score >= 0.5 || attempt === 3) {
+//             console.log("Final selected match:", bestMatch);
+//             return bestMatch;
+//         }
+
+//         console.log(`Score below threshold (< 0.5), retrying... [Attempt ${attempt}]`);
+//     }
+
+//     return bestMatch;
+// }
+
 async function findBestMatch(question, metadata) {
-    const quesPrediction = await predictSubTopic(question);
-    const extratSub = await extractJSONArray(quesPrediction);
-    // console.log("Question before Prediction:", question);
-    
-    console.log("Question Prediction:", extratSub);
-    const questionText = await generateSearchStringQues(extratSub);
-  const questionTokens = await tokenize(questionText);
-  console.log("Question Tokens:", questionTokens);
-  
-  let bestMatch = { id: null, score: 0 };
-let results = [];
+    let attempt = 0;
+    let globalBestMatch = { id: null, score: 0 };
+    let allResults = [];
 
-  for (const item of metadata) {
-    const text = await generateSearchStringMetadata(item);
-    // console.log("Comparing with:", (await text).toLowerCase);
-    
-    const tokens = await tokenize(text);
-    // console.log("Tokens for item:", tokens);
-    
-    const score = await cosineSimilarity(questionTokens, tokens);
-    if (score > bestMatch.score) {
-      bestMatch = { id: item.sub_topic_id, topic_id: item.topic.topic_id, subject_id: item.topic.subject.subject_id, score };
-    results.push({ id: item.sub_topic_id, score, sub_topic: item.name, topic: item.topic.name, subject: item.topic.subject.name });
+    while (attempt < 3) {
+        attempt++;
 
+        const quesPrediction = await predictSubTopic(question);
+        let extratSub;
+        try {
+            extratSub = await extractJSONArray(quesPrediction);
+        } catch (err) {
+            console.error(`Attempt ${attempt} - JSON extraction failed`, err);
+            continue;
+        }
+
+        console.log(`Attempt ${attempt} - Prediction:`, extratSub);
+        const questionText = await generateSearchStringQues(extratSub);
+        const questionTokens = await tokenize(questionText);
+        console.log("Question Tokens:", questionTokens);
+
+        for (const item of metadata) {
+            const text = await generateSearchStringMetadata(item);
+            const tokens = await tokenize(text);
+            const score = await cosineSimilarity(questionTokens, tokens);
+
+            allResults.push({
+                id: item.sub_topic_id,
+                topic_id: item.topic.topic_id,
+                subject_id: item.topic.subject.subject_id,
+                score,
+                sub_topic: item.name,
+                topic: item.topic.name,
+                subject: item.topic.subject.name
+            });
+
+            if (score > globalBestMatch.score) {
+                globalBestMatch = {
+                    id: item.sub_topic_id,
+                    topic_id: item.topic.topic_id,
+                    subject_id: item.topic.subject.subject_id,
+                    top: item.topic.name,
+                    sub_topic: item.name,
+                    subject: item.topic.subject.name,
+                    score
+                };
+            }
+        }
+
+        console.log(`Attempt ${attempt} - Best score in this round:`, globalBestMatch.score);
+        console.log(globalBestMatch.id, globalBestMatch.top, globalBestMatch.sub_topic, globalBestMatch.subject);
+        
+
+        // If current best in this attempt >= 0.5, we can skip the next attempts.
+        if (globalBestMatch.score >= 0.5) {
+            console.log("Score threshold met. Exiting early.");
+            break;
+        } else {
+            console.log(`Score below 0.5, retrying (Attempt ${attempt + 1})`);
+        }
     }
-  }
-  console.log("All Results:", results);
-  
 
-  return bestMatch;
-}
+    console.log("All attempts complete. Final best match:", globalBestMatch);
+    return globalBestMatch;
 }
 
 
-// Test
-// (async () => {
-//     const question = "<p>What URL would match the route if no specific action or ID is provided?</p>$$$examlyroutes.MapControllerRoute(\r\n\r\n    name: \"Product\",\r\n\r\n    url: \"products/{id}/{action}\",\r\n\r\n    defaults: new { controller = \"Product\", action = \"Index\", id = UrlParameter.Optional }\r\n\r\n);\r\n\r\n";
-//     const bestSubTopicId = await findBestMatch(question, metadata);
-//     console.log("Best Match Subtopic ID:", bestSubTopicId);
-// })();
+}

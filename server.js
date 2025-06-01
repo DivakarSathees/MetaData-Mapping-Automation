@@ -4,6 +4,7 @@ const cors = require('cors');
 require('dotenv').config();
 const { jsonrepair } = require("jsonrepair");
 const { aiMetaDataMatcher } = require('./aiMetaDataMatcher');
+const { updateMetaData } = require('./updateMetaData');
 const app = express();
 const port = 3000;
 app.use(cors());
@@ -188,6 +189,8 @@ app.post('/metadata-mapping', async (req, res) => {
                         answer_explanation: question.answer_explanation || ''
                     })
                 });
+                // call the updateMetadata function here with the question data
+                await updateMetaData(processedQuestions);
                 
             //     matchSubtopic(question.question_data, metadata.data)
             //         .then(subtopic => {
@@ -203,12 +206,9 @@ app.post('/metadata-mapping', async (req, res) => {
             //         })
             //         .catch(err => {
             //             console.error(`Error matching subtopic for question ID ${q_id}:`, err);
-            //         });
-                
-                
-                
+            //         });  
             }
-            }
+        }
 
         // Return the processed question data
         res.json({
