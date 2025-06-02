@@ -190,7 +190,6 @@ app.post('/metadata-mapping', async (req, res) => {
                     })
                 });
                 // call the updateMetadata function here with the question data
-                await updateMetaData(processedQuestions);
                 
             //     matchSubtopic(question.question_data, metadata.data)
             //         .then(subtopic => {
@@ -209,11 +208,13 @@ app.post('/metadata-mapping', async (req, res) => {
             //         });  
             }
         }
+        // Step 3: Update metadata for each question
+        const updateResults = await updateMetaData(processedQuestions, authToken);
 
         // Return the processed question data
         res.json({
-            count: processedQuestions.length,
-            questions: processedQuestions
+            processedQuestions,
+            updateResults
         });
 
     } catch (error) {
