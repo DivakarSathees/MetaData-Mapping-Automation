@@ -6,11 +6,11 @@ exports.updateMetaData = async (questionData, token) => {
         notUpdated: [],
     };
 
-    let questionNumenr = 0;
+    let questionNumber = 0;
 
     for (const question of questionData) {
-        questionNumenr++;
-        const { q_id, question_type, ...restData } = question; // Exclude q_id and question_type from payload
+        questionNumber++;
+        const { q_id, question_type, sub_topic_name, topic_name, subject_name, ...restData } = question; // Exclude q_id and question_type from payload
         let url = '';
         let method = '';
 
@@ -45,12 +45,12 @@ exports.updateMetaData = async (questionData, token) => {
                 }
             });
 
-            console.log(`Updated Q.no ${questionNumenr} ${question_type} with ID: ${q_id}`);
-            results.updated.push({q_id, question_type, questionNumenr});
+            console.log(`Updated Q.no ${questionNumber} ${question_type} with ID: ${q_id}`);
+            results.updated.push({q_id, question_type, questionNumber, sub_topic_name, topic_name, subject_name });
             
         } catch (error) {
-            console.error(`Failed to update Q.no ${questionNumenr} question ID ${q_id}:`, error.message);
-            results.notUpdated.push({ q_id, reason: error.message, question_type, questionNumenr });
+            console.error(`Failed to update Q.no ${questionNumber} question ID ${q_id}:`, error.message);
+            results.notUpdated.push({ q_id, reason: error.message, question_type, questionNumber });
         }
     }
 
