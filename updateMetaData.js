@@ -10,9 +10,14 @@ exports.updateMetaData = async (questionData, token) => {
 
     for (const question of questionData) {
         questionNumber++;
-        const { q_id, question_type, sub_topic_name, topic_name, subject_name, ...restData } = question; // Exclude q_id and question_type from payload
+        const { q_id, question_type, sub_topic_name, topic_name, subject_name, score, ...restData } = question; // Exclude q_id and question_type from payload
         let url = '';
         let method = '';
+
+        if(question?.statusOfUpload === false){
+            results.notUpdated.push({ q_id, reason: 'score is < 60%', question_type, questionNumber, upload_question: restData, sub_topic_name, topic_name, subject_name, score });
+            continue;
+        }
 
         switch (question_type) {
             case 'project_question':
@@ -46,11 +51,11 @@ exports.updateMetaData = async (questionData, token) => {
             });
 
             console.log(`Updated Q.no ${questionNumber} ${question_type} with ID: ${q_id}`);
-            results.updated.push({q_id, question_type, questionNumber, sub_topic_name, topic_name, subject_name });
+            results.updated.push({q_id, question_type, questionNumber, sub_topic_name, topic_name, subject_name, score, upload_question: restData });
             
         } catch (error) {
             console.error(`Failed to update Q.no ${questionNumber} question ID ${q_id}:`, error.message);
-            results.notUpdated.push({ q_id, reason: error.message, question_type, questionNumber });
+            results.notUpdated.push({ q_id, reason: error.message, question_type, questionNumber, upload_question: restData, sub_topic_name, topic_name, subject_name, score });
         }
     }
 

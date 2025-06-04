@@ -9,8 +9,20 @@ const grop = new Groq({
 
 exports.aiMetaDataMatcher = async (inputText, metadata) => {
     try {
-        console.log(metadata[0]);
-        
+// const metadata1 = [
+//         {
+//             "sub_topic_id": "0029cd90-4ec2-46e3-94fc-0cd48595e881",
+//             "name": "asp.net route API",
+//             "topic": {
+//                 "topic_id": "3f825847-944b-4e54-95a2-6fbd9400a336",
+//                 "name": "routing apis",
+//                 "subject": {
+//                     "subject_id": "472cf0dd-bf95-4168-894d-ee68f1f7b459",
+//                     "name": "Big Data"
+//                 }
+//             }
+//         }
+//     ]        
         const bestSubTopicId = await findBestMatch(inputText, metadata);
         console.log("Best Subtopic ID:", bestSubTopicId);
         return {bestSubTopicId};
@@ -56,7 +68,7 @@ async function predictSubTopic(inputText) {
 
     try {
         const prompt = `Based on the following question, predict the most relevant and specific subject, topic, and subtopic names.
-These names reflect the real-world context of the question with the programming language it belongs to (ie) if it is related to dotnet, then return as ASP.net.
+These names reflect the real-world context of the question with the programming language it belongs to (ie) if it is related to asp dotnet, then return as ASP.net.
 note: Don't return generic names like "Programming" or "Web Development" & don't return any scenarios or examples.
 Return the result in JSON format: {"subject": "...", "topic": "...", "sub_topic": "..."}
 
@@ -73,7 +85,7 @@ Question: ${inputText.trim().slice(0, 2000)}`;
                 {
                     role: "system",
                     content: `You are an AI model that analyzes a question and predicts the most suitable subject, topic, and subtopic.
-You must return detailed yet relevant categories. Do not be too generic (e.g., just "Programming") or too vague. You may include elaboration like "C# Programming for Web APIs" or "Routing in MVC Framework".`,
+You must return detailed yet relevant categories. Do not be too generic (e.g., just "Programming") or too vague.`,
                 },
                 {
                     role: "system",
@@ -30823,11 +30835,30 @@ You must return detailed yet relevant categories. Do not be too generic (e.g., j
 // ];
 
 async function generateSearchStringMetadata(item) {
-  return `${item.topic.subject.name} ${item.topic.name} ${item.name}`.toLowerCase();
+  // Replace whole word 'route' (case-insensitive) with 'routing'
+  const clean = str =>
+    str
+      ?.replace(/\broute\b/gi, 'routing')
+      .replace(/\bapis\b/gi, 'api') || '';
+
+  const subject = clean(item.topic.subject.name);
+  const topic = clean(item.topic.name);
+  const name = clean(item.name);
+
+  return `${subject} ${topic} ${name}`.toLowerCase();
+
 }
 
 async function generateSearchStringQues(question) {
-    return `${question.subject} ${question.topic} ${question.subtopic ? question.subtopic : question.sub_topic}`.toLowerCase();
+    const clean = str =>
+        str
+            ?.replace(/\broute\b/gi, 'routing')
+            .replace(/\bapis\b/gi, 'api') || '';    
+    const subject = clean(question.subject)
+    const topic = clean(question.topic)
+    const subtopic = clean(question.subtopic || question.sub_topic || '');
+
+    return `${subject} ${topic} ${subtopic}`.toLowerCase();
 }
 
 
@@ -30888,8 +30919,19 @@ async function tokenize(text) {
   'pandas',
   'sql statement',
   'conditional statements',
-  'basic sql'
-];
+  'basic sql',
+  'webapi',
+  'web api',
+  'c#',
+    'c#sharp',
+    'c# programming',
+    // '.net',
+    'sql server',
+    'spring boot',
+  'jdbc',  
+  'web apis',
+
+    ];
 
 // remove some common phrases that are not useful for tokenization
     const commonPhrases = [
@@ -31012,7 +31054,12 @@ async function cosineSimilarity(tokensA, tokensB) {
     'pandas': 1.5,
     'sql statement': 1.5,
     'conditional statements': 1.5,
-    'basic sql': 1.5
+    'basic sql': 1.5,
+    'webapi': 1.5,
+    'web api': 1.5,
+    'c#sharp': 2,
+    'jdbc': 1.5,
+    'pyspark': 1.5
 };
 
   const allTokens = [...new Set([...tokensA, ...tokensB])];
@@ -31151,12 +31198,12 @@ async function findBestMatch(question, metadata) {
         console.log(globalBestMatch.id, globalBestMatch.top, globalBestMatch.sub_topic, globalBestMatch.subject);
         
 
-        // If current best in this attempt >= 0.5, we can skip the next attempts.
-        if (globalBestMatch.score >= 0.5) {
+        // If current best in this attempt >= 0.6, we can skip the next attempts.
+        if (globalBestMatch.score >= 0.6) {
             console.log("Score threshold met. Exiting early.");
             break;
         } else {
-            console.log(`Score below 0.5, retrying (Attempt ${attempt + 1})`);
+            console.log(`Score below 0.6, retrying (Attempt ${attempt + 1})`);
         }
     }
 

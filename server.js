@@ -132,7 +132,9 @@ app.post('/metadata-mapping', async (req, res) => {
                 // console.log(metadata.data);   
                 const {bestSubTopicId} = await aiMetaDataMatcher(question.question_data, metadata.data);
                 console.log(`Subtopic ID for question ID ${q_id}:`, bestSubTopicId.id);
+                // if 
                 if (bestSubTopicId) {
+                    question.score = bestSubTopicId.score;
                     question.sub_topic_id = bestSubTopicId.id;
                     question.topic_id = bestSubTopicId.topic_id;
                     question.subject_id = bestSubTopicId.subject_id;
@@ -142,10 +144,70 @@ app.post('/metadata-mapping', async (req, res) => {
                 } else {
                     console.warn(`No matching subtopic found for question ID ${q_id}`);
                 }
+
+                //  if bestSubTopiCId.score < 0.5 then set sub_topic_id, topic_id, subject_id to null & push only this to processedQuestions & continue to next question ie dont process this question further
+                if (bestSubTopicId && bestSubTopicId.score < 0.6) {
+                    processedQuestions.push({
+                        q_id: q_id,
+                        score: question.score,
+                        statusOfUpload: false,
+                        question_type: question.question_type,
+                        subject_id: question.subject_id || null,
+                        topic_id: question.topic_id || null,
+                        sub_topic_id: question.sub_topic_id || null,
+                        question_data: question.question_data,
+                        question_editor_type: question.question_editor_type,
+                        sub_topic_name: question.sub_topic_name || null,
+                        topic_name: question.topic_name || null,
+                        subject_name: question.subject_name || null,
+                        // options: question.question_type === 'mcq_single_correct'
+                        //     ? (typeof question.options === 'string'
+                        //         ? JSON.parse(question.options)
+                        //         : (question.options || []))
+                        //     : [],
+                        blooms_taxonomy: question.blooms_taxonomy || null,
+                        // course_outcomes: question.course_outcomes || [],
+                        // program_outcomes: question.program_outcomes || [],
+                        // answer_explanation: question.answer_explanation || '',
+                        manual_difficulty: question.manual_difficulty || null,
+                        linked_concepts: question.linked_concepts || "",
+                        hint: question.hints || [],
+                        // tags: question.tags || [],
+                        tags: Array.isArray(question.tags) ? question.tags.map(tag => tag.name) : [],
+                        // has_auto_evaluation: question.question_type === 'project_question' ? question.project_questions.has_auto_evaluation : false,
+                        // config: question.question_type === 'project_question' ? question.project_questions.config : null,
+                        // boilerPlate: question.question_type === 'project_question' ? question.project_questions.boilerPlate : null,
+                        // evaluation_type: question.question_type === 'project_question' ? question.project_questions.evaluation_type : null,
+                        question_media: question.question_media || [],
+                        createdBy: question.createdBy || null,
+                        // image: question.question_type === 'project_question' ? question.project_questions.image : null,
+                        // node_pool: question.question_type === 'project_question' ? question.project_questions.node_pool : null,
+                        // themes: question.question_type === 'project_question' ? question.project_questions.themes : [],
+                        // src_directory: question.question_type === 'project_question' ? question.src_directory : null,
+                        // test_directory: question.question_type === 'project_question' ? question.test_directory : null,
+                        ...(question.question_type === 'project_question' && {
+                            has_auto_evaluation: question.project_questions.has_auto_evaluation,
+                            config: question.project_questions.config,
+                            boilerPlate: question.project_questions.boilerPlate,
+                            evaluation_type: question.project_questions.evaluation_type,
+                            image: question.project_questions.image,
+                            node_pool: question.project_questions.node_pool,
+                            themes: question.project_questions.themes || [],
+                            src_directory: question.src_directory || null,
+                            test_directory: question.test_directory || null
+                        }),
+                        ...(question.question_type === 'mcq_single_correct' && {
+                            answer_explanation: question.answer_explanation || ''
+                        })
+                    });
+                    
+                    continue; // Skip further processing for this question
+                }
                 
 
                 processedQuestions.push({
                     q_id: q_id,
+                    score: question.score,
                     question_type: question.question_type,
                     subject_id: question.subject_id || null,
                     topic_id: question.topic_id || null,
